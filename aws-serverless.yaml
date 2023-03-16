@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Runtime: dotnetcore3.1
+    MemorySize: 256
+    Timeout: 30
+
+Resources:
+  ApiGatewayRestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      DefinitionBody:
+        swagger: '2.0'
+        info:
+          title: Your API Title
+          version: '1.0'
+        paths:
+          /api/{proxy+}:
+            x-amazon-apigateway-any-method:
+              produces:
+                - application/json
+              parameters:
+                - name: "proxy"
+                  in: "path"
+                  required: true
+                  type: "string"
+                - name: "Authorization"
+                  in: "header"
+                  required: true
+                  type: "string"
+              responses:
+                "200":
+                  description: "OK"
+            x-amazon-apigateway-binary-media-types:
+              - "*/*"
+
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: YourNamespace.YourFunction::FunctionHandler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/YourRoleName'
+      CodeUri: bin/Release/netcoreapp3.1/publish/
+      Events:
+        ApiGateway:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Path: /api/{proxy+}
+            Method: ANY
+      Layers:
+        - !Ref LambdaLayer
+
+  LambdaLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: YourLayerName
+      Description: Your Layer Description
+      ContentUri: ./layer/
+      CompatibleRuntimes:
+        - dotnetcore3.1
+
+Outputs:
+  ApiEndpoint:
+    Description: API endpoint URL for Prod stage
+    Value: !Sub "https://${ServerlessRestApi}.execute-api
